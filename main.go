@@ -91,32 +91,85 @@ type serviceNamePort struct {
 
 const DockerImage = "localstack/localstack"
 
+func createOneContainer(ctx context.Context, docker *client.Client, imageName string, services map[int]serviceNamePort) response {
+	servicesName := ""
+	for _, service := range services {
+		servicesName += service.name
+	}
+
+	env := []string{
+		"HOSTNAME=localhost",
+		"SERVICE=" + servicesName,
+	}
+
+	var servicePort nat.Port
+	for _, service := range services {
+		servicePort += service.port + ": struct{}{},"
+	}
+
+	config := &container.Config{
+		Image:        imageName,
+		Hostname:     "localhost",
+		ExposedPorts: exposedPorts(services),
+		Env:          env,
+	}
+
+	hostConfig := &container.HostConfig{
+		PortBindings: portBindings(services),
+	}
+
+	respCreate, errCreate := docker.ContainerCreate(ctx, config, hostConfig, nil, "")
+	if errCreate != nil {
+		panic(errCreate)
+	}
+
+	responseCreate := response{resp: respCreate, err: errCreate}
+
+	return responseCreate
+}
+func portBindings(services map[int]serviceNamePort) nat.PortMap {
+	var portBindings = make(map[nat.Port][]nat.PortBinding)
+
+	for _, service := range services {
+		portBindings[service.port] = []nat.PortBinding{
+			{
+				HostIP:   "0.0.0.0",
+				HostPort: service.port.Port(),
+			},
+		}
+	}
+	return portBindings
+}
+
+func exposedPorts(services map[int]serviceNamePort) nat.PortSet {
+	var exposedPorts = make(map[nat.Port]struct{})
+	for _, service := range services {
+		exposedPorts[service.port] = struct{}{}
+	}
+	return exposedPorts
+}
+
 func main() {
 	ctx := context.Background()
 
 	docker, err := createDockerClient()
 	pullImage(ctx, DockerImage, docker, err)
 
-	// serviceDynamo := serviceNamePort{name: "dynamodb", port: "4569/tcp"}
+	serviceDynamo := serviceNamePort{name: "dynamodb", port: "4569/tcp"}
 	serviceS3 := serviceNamePort{name: "S3", port: "4572/tcp"}
-	// serviceMonitor := serviceNamePort{name: "", port: "8080/tcp"}
+	serviceUI := serviceNamePort{name: "", port: "8080/tcp"}
 
 	services := map[int]serviceNamePort{
-		// 0: serviceDynamo,
+		0: serviceDynamo,
 		1: serviceS3,
-		// 2: serviceMonitor,
+		2: serviceUI,
 	}
 
-	resp := make(map[int]response)
+	response := createOneContainer(ctx, docker, DockerImage, services)
 
-	for k, s := range services {
-		resp[k] = createContainer(ctx, docker, DockerImage, s.port, s.name)
-		fmt.Println(services[k].name, " container created!!")
-	}
-
-	for k := range resp {
-		startContainer(ctx, docker, resp[k].resp, resp[k].err)
-		fmt.Println(services[k].name, " container running!!")
+	startContainer(ctx, docker, response.resp, response.err)
+	for i := range services {
+		fmt.Println(services[i].name, " service running!!")
 	}
 
 	// Wait until services is accesible
@@ -124,11 +177,11 @@ func main() {
 
 	// Bucket creation
 	bucketName := "test"
-	createBucket(bucketName)
+	createBucket(bucketName, serviceS3)
 }
 
-func createBucket(bucketName string) {
-	cmd := exec.Command("/bin/bash", "-c", "aws s3api create-bucket --endpoint-url=http://localhost:4572 --bucket "+bucketName)
+func createBucket(bucketName string, serviceS3 serviceNamePort) {
+	cmd := exec.Command("/bin/bash", "-c", "aws s3api create-bucket --endpoint-url=http://localhost:"+serviceS3.port.Port()+" --bucket "+bucketName)
 
 	_, errCommand := cmd.Output()
 
