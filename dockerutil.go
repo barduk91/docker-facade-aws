@@ -1,6 +1,9 @@
 package main
 
 import (
+	"io"
+	"os"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
@@ -18,10 +21,13 @@ func createDockerClient() (*client.Client, error) {
 }
 
 func pullImage(ctx context.Context, imageName string, docker *client.Client, err error) {
-	_, err = docker.ImagePull(ctx, imageName, types.ImagePullOptions{})
+	var image io.ReadCloser
+	image, err = docker.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
 		panic(err)
 	}
+	io.Copy(os.Stdout, image)
+
 }
 
 func startContainer(ctx context.Context, docker *client.Client, resp container.ContainerCreateCreatedBody, err error) {

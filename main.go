@@ -1,8 +1,10 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/awslabs/goformation"
@@ -34,12 +36,25 @@ type serviceNamePort struct {
 }
 
 func main() {
+	templateFile := flag.String("f", "", "cloudformation template file")
+
+	flag.Parse()
+
+	if len(*templateFile) == 0 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	if _, err := os.Stat(*templateFile); os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "%s not found\n", *templateFile)
+		os.Exit(2)
+	}
 	ctx := context.Background()
 
 	docker, err := createDockerClient()
 	pullImage(ctx, DockerImage, docker, err)
 
-	template, err := goformation.Open("s3example.yaml")
+	template, err := goformation.Open(*templateFile)
 	if err != nil {
 		log.Fatalf("There was an error processing the template: %s", err)
 	}

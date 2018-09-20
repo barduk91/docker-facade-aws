@@ -43,6 +43,7 @@ func createBucket(bucketName string, serviceS3 serviceNamePort) {
 
 	if errCommand != nil {
 		fmt.Println(errCommand.Error())
+		fmt.Println("AWS cli should be installed and configured to create resources")
 		return
 	}
 	fmt.Printf("Bucket %q successfully created\n", bucketName)
