@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"os"
 
@@ -11,6 +12,7 @@ import (
 	"golang.org/x/net/context"
 )
 
+// Create a docker client
 func createDockerClient() (*client.Client, error) {
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -20,23 +22,27 @@ func createDockerClient() (*client.Client, error) {
 	return cli, err
 }
 
+// Pull image from docker registry. It wait till image is downloaded
 func pullImage(ctx context.Context, imageName string, docker *client.Client, err error) {
 	var image io.ReadCloser
 	image, err = docker.ImagePull(ctx, imageName, types.ImagePullOptions{})
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
 	}
 	io.Copy(os.Stdout, image)
 
 }
 
+// Start container previously created
 func startContainer(ctx context.Context, docker *client.Client, resp container.ContainerCreateCreatedBody, err error) {
 	if err := docker.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
 		panic(err)
 	}
 }
 
-func createOneContainer(ctx context.Context, docker *client.Client, imageName string, services map[int]serviceNamePort) response {
+// Create container with service needed
+func createContainer(ctx context.Context, docker *client.Client, imageName string, services map[int]serviceNamePort) response {
 	servicesName := ""
 	for _, service := range services {
 		servicesName += service.name
@@ -72,6 +78,8 @@ func createOneContainer(ctx context.Context, docker *client.Client, imageName st
 
 	return responseCreate
 }
+
+// Bind port between localhost and docker container
 func portBindings(services map[int]serviceNamePort) nat.PortMap {
 	var portBindings = make(map[nat.Port][]nat.PortBinding)
 
@@ -86,6 +94,7 @@ func portBindings(services map[int]serviceNamePort) nat.PortMap {
 	return portBindings
 }
 
+// Expose ports needed inside your docker container
 func exposedPorts(services map[int]serviceNamePort) nat.PortSet {
 	var exposedPorts = make(map[nat.Port]struct{})
 	for _, service := range services {

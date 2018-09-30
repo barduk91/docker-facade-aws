@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  MySNSTopic: 
+    Type: AWS::SNS::Topic
+    Properties: 
+      Subscription: 
+        - 
+          Endpoint: 
+            Fn::GetAtt: 
+              - "MyQueue1"
+              - "Arn"
+          Protocol: "sqs"
+        - 
+          Endpoint: 
+            Fn::GetAtt: 
+              - "MyQueue2"
+              - "Arn"
+          Protocol: "sqs"
+      TopicName: "SampleTopic"
+  MySourceQueue: 
+    Type: AWS::SQS::Queue
+    Properties: 
+      QueueName: MyQueue1
+      RedrivePolicy: 
+        deadLetterTargetArn: 
+          Fn::GetAtt: 
+            - "MyDeadLetterQueue"
+            - "Arn"
+        maxReceiveCount: 5
+  MyDeadLetterQueue: 
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: MyQueue2
+        #MyTopicSubscription
+  MySubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Endpoint:
+        Fn::GetAtt:
+          - "MyQueue"
+          - "Arn"
+      Protocol: "sqs"
+      TopicArn: !Ref "SampleTopic"
+Outputs:
+  SourceQueueURL: 
+    Description: "URL of the source queue"
+    Value: 
+      Ref: "MySourceQueue"
+  SourceQueueARN: 
+    Description: "ARN of the source queue"
+    Value: 
+      Fn::GetAtt: 
+        - "MySourceQueue"
+        - "Arn"
+  DeadLetterQueueURL: 
+    Description: "URL of the dead letter queue"
+    Value: 
+      Ref: "MyDeadLetterQueue"
+  DeadLetterQueueARN: 
+    Description: "ARN of the dead letter queue"
+    Value: 
+      Fn::GetAtt: 
+        - "MyDeadLetterQueue"
+        - "Arn"

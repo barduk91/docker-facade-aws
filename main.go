@@ -15,10 +15,10 @@ import (
 )
 
 // Image docker for localstack
-var DockerImage = "localstack/localstack"
+var dockerImage = "localstack/localstack"
 
 // Service supported
-var serviceDynamo = serviceNamePort{name: "dynamodb", port: "4569/tcp"}
+var serviceSns = serviceNamePort{name: "sns", port: "4575/tcp"}
 var serviceS3 = serviceNamePort{name: "S3", port: "4572/tcp"}
 var serviceSqs = serviceNamePort{name: "sqs", port: "4576/tcp"}
 var serviceUI = serviceNamePort{name: "", port: "8080/tcp"}
@@ -36,6 +36,9 @@ type serviceNamePort struct {
 }
 
 func main() {
+	ctx := context.Background()
+
+	// Get file as parameter and parse it
 	templateFile := flag.String("f", "", "cloudformation template file")
 
 	flag.Parse()
@@ -49,31 +52,31 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%s not found\n", *templateFile)
 		os.Exit(2)
 	}
-	ctx := context.Background()
-
-	docker, err := createDockerClient()
-	pullImage(ctx, DockerImage, docker, err)
 
 	template, err := goformation.Open(*templateFile)
 	if err != nil {
 		log.Fatalf("There was an error processing the template: %s", err)
 	}
 
+	// Create docker client and download image if it's needed
+	docker, err := createDockerClient()
+	pullImage(ctx, dockerImage, docker, err)
+
+	// Get all service inside cloudformation template provided
 	services := getAllServices(template)
 
-	response := createOneContainer(ctx, docker, DockerImage, services)
+	// Create docker container with all service found in your cloudformation template
+	response := createContainer(ctx, docker, dockerImage, services)
 
+	// Start docker container
 	startContainer(ctx, docker, response.resp, response.err)
 	for i := range services {
-		fmt.Println(services[i].name, " service running!!")
+		fmt.Println(services[i].name, " service created")
 	}
 
 	// Wait until services is up
 	time.Sleep(20 * time.Second)
 
-	// Bucket creation
-	s3buckets := template.GetAllAWSS3BucketResources()
-	for _, bucketName := range s3buckets {
-		createBucket(bucketName.BucketName, serviceS3)
-	}
+	// Create all resources found in your cloudformation template that it support
+	createResources(template)
 }

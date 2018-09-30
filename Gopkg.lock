@@ -94,6 +94,25 @@
   version = "v1.0.0"
 
 [[projects]]
+  digest = "1:fa4386968d0ba5116a73a9b166c76bdf340317f56f19dd0c7b64376d434b786c"
+  name = "github.com/onsi/gomega"
+  packages = ["format"]
+  pruneopts = "UT"
+  revision = "7615b9433f86a8bdf29709bf288bc4fd0636a369"
+  version = "v1.4.2"
+
+[[projects]]
+  branch = "master"
+  digest = "1:b0709d713b5977be0ce61d2a711766b414467cb70a04b0367515fd776e1fb3cf"
+  name = "github.com/petergtz/pegomock"
+  packages = [
+    ".",
+    "internal/verify",
+  ]
+  pruneopts = "UT"
+  revision = "278dd9bee02596f5347dcffe7736d1ff1794223c"
+
+[[projects]]
   digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
   name = "github.com/pkg/errors"
   packages = ["."]
@@ -156,6 +175,7 @@
     "github.com/docker/docker/api/types/container",
     "github.com/docker/docker/client",
     "github.com/docker/go-connections/nat",
+    "github.com/petergtz/pegomock",
     "golang.org/x/net/context",
   ]
   solver-name = "gps-cdcl"
