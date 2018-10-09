@@ -50,7 +50,8 @@ func createResources(template *cloudformation.Template) {
 func createResourcesForSQS(template *cloudformation.Template) {
 	sqsQueues := template.GetAllAWSSQSQueueResources()
 	for _, queueName := range sqsQueues {
-		createQueue(queueName.QueueName, serviceSqs)
+		cmd := exec.Command("/bin/bash", "-c", "aws sqs create-queue  --endpoint-url=http://localhost:"+serviceSqs.port.Port()+" --queue-name "+queueName.QueueName)
+		createQueue(queueName.QueueName, cmd)
 	}
 }
 
@@ -58,7 +59,8 @@ func createResourcesForSQS(template *cloudformation.Template) {
 func createResourcesForS3(template *cloudformation.Template) {
 	s3buckets := template.GetAllAWSS3BucketResources()
 	for _, bucketName := range s3buckets {
-		createBucket(bucketName.BucketName, serviceS3)
+		cmd := exec.Command("/bin/bash", "-c", "aws s3api create-bucket --endpoint-url=http://localhost:"+serviceS3.port.Port()+" --bucket "+bucketName.BucketName)
+		createBucket(bucketName.BucketName, cmd)
 	}
 }
 
@@ -66,7 +68,9 @@ func createResourcesForS3(template *cloudformation.Template) {
 func createResourcesForSNS(template *cloudformation.Template) {
 	topicsSns := template.GetAllAWSSNSTopicResources()
 	for _, topicName := range topicsSns {
-		createTopic(topicName.TopicName, serviceSns)
+		cmd := exec.Command("/bin/bash", "-c", "aws sns create-topic  --endpoint-url=http://localhost:"+serviceSns.port.Port()+" --name "+topicName.TopicName)
+		createTopic(topicName.TopicName, cmd)
+		// createTopic(topicName.TopicName, serviceSns)
 	}
 
 	// Subscribe to SNS Topic if needed
@@ -74,9 +78,7 @@ func createResourcesForSNS(template *cloudformation.Template) {
 }
 
 // Create an empty bucket
-func createBucket(bucketName string, serviceS3 serviceNamePort) {
-	cmd := exec.Command("/bin/bash", "-c", "aws s3api create-bucket --endpoint-url=http://localhost:"+serviceS3.port.Port()+" --bucket "+bucketName)
-
+func createBucket(bucketName string, cmd *exec.Cmd) {
 	_, errCommand := cmd.Output()
 
 	if errCommand != nil {
@@ -93,7 +95,8 @@ func getSnsSubscriptions(template *cloudformation.Template) {
 	for _, subscription := range snsSubscriptions {
 		protocol := subscription.Protocol
 		var subscriptor string
-		topic := getTopicArn(subscription.TopicArn)
+		cmd := exec.Command("/bin/bash", "-c", "aws sns list-topics --endpoint-url=http://localhost:"+serviceSns.port.Port())
+		topic := getTopicArn(subscription.TopicArn, cmd)
 		if strings.Contains(protocol, "sqs") {
 			subscriptor = "http://localhost:" + serviceSqs.port.Port()
 		} else {
@@ -104,15 +107,21 @@ func getSnsSubscriptions(template *cloudformation.Template) {
 }
 
 // Get arn for given topic sns name. Should be create before instead it return empty
-func getTopicArn(topicName string) string {
-	cmd := exec.Command("/bin/bash", "-c", "aws sns list-topics --endpoint-url=http://localhost:"+serviceSns.port.Port())
-
+func getTopicArn(topicName string, cmd *exec.Cmd) string {
 	topicCloudFormation, errCommand := cmd.Output()
 
 	var dat map[string][]map[string]string
 
+	if errCommand != nil {
+		fmt.Println(errCommand.Error())
+		fmt.Println("AWS cli should be installed and configured to create resources")
+		return ""
+	}
+
 	if err := json.Unmarshal(topicCloudFormation, &dat); err != nil {
-		panic(err)
+		fmt.Println(err.Error())
+		fmt.Println("There aren't any topic created to subscribe to")
+		return ""
 	}
 
 	listTopics := dat["Topics"]
@@ -122,12 +131,6 @@ func getTopicArn(topicName string) string {
 		if strings.Contains(candidate, topicName) {
 			return candidate
 		}
-	}
-
-	if errCommand != nil {
-		fmt.Println(errCommand.Error())
-		fmt.Println("AWS cli should be installed and configured to create resources")
-		return ""
 	}
 
 	return ""
@@ -152,13 +155,12 @@ func createSubscription(protocol string, subscriptor string, topic string) {
 		panic(err)
 	}
 
-	confirmSubscription(topic, token["SubscriptionArn"])
+	cmdSub := exec.Command("/bin/bash", "-c", "aws sns confirm-subscription --endpoint-url=http://localhost:"+serviceSns.port.Port()+" --topic-arn  "+topic+" --token "+token["SubscriptionArn"])
+	confirmSubscription(topic, cmdSub)
 }
 
 // Confirm subscription to an sns topic
-func confirmSubscription(topicName string, token string) {
-	cmd := exec.Command("/bin/bash", "-c", "aws sns confirm-subscription --endpoint-url=http://localhost:"+serviceSns.port.Port()+" --topic-arn  "+topicName+" --token "+token)
-
+func confirmSubscription(topicName string, cmd *exec.Cmd) {
 	_, errCommand := cmd.Output()
 
 	if errCommand != nil {
@@ -171,9 +173,7 @@ func confirmSubscription(topicName string, token string) {
 }
 
 // Create an sns topic
-func createTopic(topicName string, serviceSns serviceNamePort) {
-	cmd := exec.Command("/bin/bash", "-c", "aws sns create-topic  --endpoint-url=http://localhost:"+serviceSns.port.Port()+" --name "+topicName)
-
+func createTopic(topicName string, cmd *exec.Cmd) {
 	_, errCommand := cmd.Output()
 
 	if errCommand != nil {
@@ -185,8 +185,7 @@ func createTopic(topicName string, serviceSns serviceNamePort) {
 }
 
 // Create a sqs default queue
-func createQueue(queueName string, serviceSqs serviceNamePort) {
-	cmd := exec.Command("/bin/bash", "-c", "aws sqs create-queue  --endpoint-url=http://localhost:"+serviceSqs.port.Port()+" --queue-name "+queueName)
+func createQueue(queueName string, cmd *exec.Cmd) {
 
 	_, errCommand := cmd.Output()
 

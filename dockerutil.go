@@ -37,7 +37,9 @@ func pullImage(ctx context.Context, imageName string, docker *client.Client, err
 // Start container previously created
 func startContainer(ctx context.Context, docker *client.Client, resp container.ContainerCreateCreatedBody, err error) {
 	if err := docker.ContainerStart(ctx, resp.ID, types.ContainerStartOptions{}); err != nil {
-		panic(err)
+		fmt.Println(err)
+		fmt.Println("Can't start docker container")
+		return
 	}
 }
 
@@ -71,7 +73,9 @@ func createContainer(ctx context.Context, docker *client.Client, imageName strin
 
 	respCreate, errCreate := docker.ContainerCreate(ctx, config, hostConfig, nil, "")
 	if errCreate != nil {
-		panic(errCreate)
+		fmt.Println(errCreate.Error())
+		fmt.Println("Can not create a container")
+		os.Exit(-1)
 	}
 
 	responseCreate := response{resp: respCreate, err: errCreate}
